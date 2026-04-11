@@ -25,3 +25,6 @@ Thumbs.db
 # Local Scripts
 auto_commit.sh
 push_git.sh
+
+# Workspaces
+*.code-workspace

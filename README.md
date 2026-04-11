@@ -57,15 +57,28 @@ Need to dig deeper? Seamlessly switch from standard OSINT into our heavy-duty Da
    ```
 
 2. **Initialize the Virtual Environment**
-   ULTINT heavily utilizes a virtual environment (`venv`) to keep complex data science dependencies (pandas, scikit-learn, networkx) isolated from your system packages.
+   ULTINT heavily utilizes a virtual environment (`venv`) to keep complex data science dependencies isolated from your system packages.
+   
+   *Linux/macOS:*
    ```bash
    python3 -m venv venv
    ```
+   *Windows (PowerShell):*
+   ```powershell
+   python.exe -m venv venv
+   ```
 
 3. **Install Dependencies & Playwright**
+   
+   *Linux/macOS:*
    ```bash
    ./venv/bin/pip install -r requirements.txt
    ./venv/bin/python3 -m playwright install chromium
+   ```
+   *Windows (PowerShell):*
+   ```powershell
+   .\venv\Scripts\pip install -r requirements.txt
+   .\venv\Scripts\python.exe -m playwright install chromium
    ```
 
 ### 🌍 Global Execution (Highly Recommended)

@@ -4,7 +4,9 @@ import sys
 
 # Automatically restart inside the virtual environment if it exists and we're not inside it
 if not hasattr(sys, 'real_prefix') and not (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
-    venv_python = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'venv', 'bin', 'python')
+    venv_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'venv')
+    venv_python = os.path.join(venv_dir, 'Scripts', 'python.exe') if os.name == 'nt' else os.path.join(venv_dir, 'bin', 'python')
+    
     if os.path.exists(venv_python):
         os.execl(venv_python, venv_python, *sys.argv)
 
@@ -45,19 +47,15 @@ class UltintConsole(cmd.Cmd):
 
     def do_crypto(self, arg):
         """
-        Cryptography and Hash functions (CyberChef-lite)
+        Cryptography and Forensic Hash functions (CyberChef-lite)
         Usage: crypto <subcommand> <args>
         Subcommands:
-            auto <text> : Try to auto-detect and decode!
-            b64e / b64d : Base64 encode/decode
-            b32e / b32d : Base32 encode/decode
-            hex / unhex : Hexadecimal encode/decode
-            bin / unbin : Binary encode/decode
-            oct / unoct : Octal encode/decode
-            url <text>  : URL decode
-            rot13 <text>: ROT13 encode/decode
-            md5 <text>  : Calculate MD5
-            sha256 <txt>: Calculate SHA256
+            enc <method> <data>   : Encode/Encrypt (b64, b32, b85, hex, bin, oct, url, morse, atbash, rot13, caesar)
+            dec <method> <data>   : Decode/Decrypt (b64, b32, b85, hex, bin, oct, url, morse, atbash, rot13, caesar)
+            hash <method> <data>  : Hash generator (md5, sha1, sha256, ntlm)
+            crack <hash>          : Hash Cracker (Nitrxgen API + RockYou 14.3M Auto-Downloader)
+            xor <key> <data>      : XOR encryption/decryption using string or hex keys
+            magic <data>          : Recursive Auto-Decoder (Bounces through 5 layers natively)
         """
         crypto.handle_command(arg, console)
 
