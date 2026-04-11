@@ -173,19 +173,14 @@ def _check_ntlm(word, target_hash):
 def run_cracker(target_hash, console, deep=False):
     target_hash = target_hash.lower()
     
-    # ── Phase 0: Online Rainbow Table APIs ──
-    online_apis = []
+    # ── Phase 0: Online Rainbow Table API ──
     if len(target_hash) == 32:
-        online_apis.append(("Nitrxgen MD5 DB", f"https://www.nitrxgen.net/md5db/{target_hash}"))
-    online_apis.append(("md5decrypt.net", f"https://md5decrypt.net/Api/api.php?hash={target_hash}&hash_type=md5&email=deraj@gmail.com&code=1152d62e046bc2e0"))
-    
-    for api_name, url in online_apis:
         try:
-            with console.status(f"[cyan]Querying {api_name}...[/cyan]"):
-                r = requests.get(url, timeout=5)
+            with console.status("[cyan]Querying Nitrxgen Rainbow Tables...[/cyan]"):
+                r = requests.get(f"https://www.nitrxgen.net/md5db/{target_hash}", timeout=5)
                 text = r.text.strip()
-                if text and len(text) < 100 and 'ERROR CODE' not in text.upper() and text.lower() not in ('', 'not found', 'error', 'none', 'null', 'false'):
-                    console.print(Panel(f"Password Found (Online): [bold green]{text}[/bold green]", title=f"🌐 {api_name}", border_style="green"))
+                if text and len(text) < 60:
+                    console.print(Panel(f"Password Found (Online): [bold green]{text}[/bold green]", title="🌐 Nitrxgen MD5 DB", border_style="green"))
                     return
         except: pass
     
