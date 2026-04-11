@@ -86,9 +86,12 @@ ULTINT features a smart process-switcher! You can alias the script globally into
 
 *Linux/macOS (Bash/Zsh):*
 ```bash
-mkdir -p ~/.local/bin
-ln -sf $(pwd)/ultint.py ~/.local/bin/ultint
 chmod +x ultint.py
+# If using Bash (Default Linux):
+echo "alias ultint='$(pwd)/ultint.py'" >> ~/.bashrc && source ~/.bashrc
+
+# If using Zsh (Default macOS):
+echo "alias ultint='$(pwd)/ultint.py'" >> ~/.zshrc && source ~/.zshrc
 ```
 
 *Windows (PowerShell):*
