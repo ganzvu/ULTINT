@@ -13,7 +13,7 @@ Constructed in Python and stylized using the `rich` UI library, ULTINT provides 
 - **Crypto & Magic Decoding (`crypto`)**: A "CyberChef-lite" built straight into your terminal. Execute base64, hex, ROT13, and URL decoding. **Auto-Magic Mode** uses a Breadth-First Search (BFS) algorithm to recursively unwrap multi-layer encoded strings up to 5 layers deep until human-readable text is discovered.
 - **Forensics (`forensics`)**: Wrapper interactions for local binary analysis, including embedded `exiftool` metadata parsing and `strings` extraction from suspected payloads.
 - **Reconnaissance (`recon`)**: Execute lightning-fast WHOIS lookups and NMAP port scanning, alongside a completely keyless **Shodan InternetDB API** lookup (`idb`) and an **Archive.org Wayback Machine** ghost-endpoint extractor (`wayback`).
-- **Social & Identity (`social`)**: Hunt targeting usernames across multiple social footprints.
+- **Social & Identity (`social`)**: Hunt targeting usernames using an ultra-fast **AsyncSherlock engine** that queries 400+ platforms concurrently (`username`). Execute **Holehe-style Silent Email traps** to verify if a target email is registered against backend APIs like Spotify and Imgur without altering the user (`email`).
 
 ### 🕵️ Instagram Deep Analysis (IG-Detective Sub-Shell)
 Seamlessly switch from standard OSINT into the heavy-duty **IG-Detective** environment by typing `instagram`. 

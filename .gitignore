@@ -21,3 +21,7 @@ Thumbs.db
 # IDEs
 .vscode/
 .idea/
+
+# Local Scripts
+auto_commit.sh
+push_git.sh
