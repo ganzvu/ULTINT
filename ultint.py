@@ -54,7 +54,7 @@ class UltintConsole(cmd.Cmd):
             enc <method> <data>   : Encode/Encrypt (b64, b32, b85, hex, bin, oct, url, morse, atbash, rot13, caesar)
             dec <method> <data>   : Decode/Decrypt (b64, b32, b85, hex, bin, oct, url, morse, atbash, rot13, caesar)
             hash <method> <data>  : Hash generator (md5, sha1, sha256, ntlm)
-            crack <hash>          : Hash Cracker (Nitrxgen API + RockYou 14.3M Auto-Downloader)
+            crack <hash> [--deep] : Hash Cracker (Online APIs + RockYou 14.3M + Deep Mutation ~100M)
             xor <key> <data>      : XOR encryption/decryption using string or hex keys
             magic <data>          : Recursive Auto-Decoder (Bounces through 5 layers natively)
         """
