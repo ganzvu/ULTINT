@@ -66,8 +66,10 @@ class UltintConsole(cmd.Cmd):
         Network and Reconnaissance functions
         Usage: recon <subcommand> <args>
         Subcommands:
-            whois <domain> : Get WHOIS info
-            nmap <ip>      : Run basic local nmap
+            whois <domain>  : Get WHOIS info
+            nmap <ip>       : Run basic targeted nmap
+            idb <ip>        : Retrieve Shodan InternetDB data without API keys
+            wayback <domain>: Extract historically archived endpoints via CDX
         """
         recon.handle_command(arg, console)
 
@@ -83,10 +85,11 @@ class UltintConsole(cmd.Cmd):
 
     def do_social(self, arg):
         """
-        Social Media and People Search
+        Social Media and Identity Search
         Usage: social <subcommand> <args>
         Subcommands:
-            username <name> : Search for username on major platforms
+            username <name> : Async Sherlock engine querying 400+ platforms
+            email <address> : Silent verification of email on major platforms
         """
         social.handle_command(arg, console)
 
