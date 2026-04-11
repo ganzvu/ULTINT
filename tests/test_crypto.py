@@ -245,53 +245,53 @@ class TestHandleCommand:
         crypto.handle_command("", c)
         c.print.assert_called_once()
         args = c.print.call_args[0][0]
-        assert "subcommand" in args.lower() or "Please" in args
+        assert "Usage:" in args
 
     def test_b64e(self):
         c = self._console()
-        crypto.handle_command("b64e hello", c)
+        crypto.handle_command("enc b64 hello", c)
         c.print.assert_called_once()
 
     def test_b64d(self):
         c = self._console()
-        crypto.handle_command("b64d aGVsbG8=", c)
+        crypto.handle_command("dec b64 aGVsbG8=", c)
         c.print.assert_called_once()
 
     def test_md5(self):
         c = self._console()
-        crypto.handle_command("md5 hello", c)
+        crypto.handle_command("hash md5 hello", c)
         c.print.assert_called_once()
 
     def test_sha256(self):
         c = self._console()
-        crypto.handle_command("sha256 hello", c)
+        crypto.handle_command("hash sha256 hello", c)
         c.print.assert_called_once()
 
     def test_hex(self):
         c = self._console()
-        crypto.handle_command("hex hello", c)
+        crypto.handle_command("enc hex hello", c)
         c.print.assert_called_once()
 
     def test_unhex(self):
         c = self._console()
-        crypto.handle_command("unhex 68656c6c6f", c)
+        crypto.handle_command("dec hex 68656c6c6f", c)
         c.print.assert_called_once()
 
     def test_bin(self):
         c = self._console()
-        crypto.handle_command("bin A", c)
+        crypto.handle_command("enc bin A", c)
         c.print.assert_called_once()
 
     def test_rot13(self):
         c = self._console()
-        crypto.handle_command("rot13 hello", c)
+        crypto.handle_command("enc rot13 hello", c)
         c.print.assert_called_once()
 
     def test_magic_auto(self):
         import base64
         c = self._console()
         encoded = base64.b64encode(b"hello").decode()
-        crypto.handle_command(f"auto {encoded}", c)
+        crypto.handle_command(f"magic {encoded}", c)
         c.print.assert_called_once()
 
     def test_unknown_subcommand(self):
@@ -301,52 +301,50 @@ class TestHandleCommand:
 
     def test_missing_data(self):
         c = self._console()
-        crypto.handle_command("b64d", c)
+        crypto.handle_command("dec", c)
         c.print.assert_called_once()
 
     def test_decoding_error_handled_gracefully(self):
         c = self._console()
-        # Passing invalid base64 should trigger the except block, not raise
-        crypto.handle_command("b64d !!!invalid!!!", c)
+        crypto.handle_command("dec b64 !!!invalid!!!", c)
         c.print.assert_called_once()
 
     def test_b32e(self):
         c = self._console()
-        crypto.handle_command("b32e hello", c)
+        crypto.handle_command("enc b32 hello", c)
         c.print.assert_called_once()
 
     def test_b32d(self):
         import base64
         c = self._console()
         encoded = base64.b32encode(b"hello").decode()
-        crypto.handle_command(f"b32d {encoded}", c)
+        crypto.handle_command(f"dec b32 {encoded}", c)
         c.print.assert_called_once()
 
     def test_url_decode(self):
         c = self._console()
-        crypto.handle_command("url hello%20world", c)
+        crypto.handle_command("dec url hello%20world", c)
         c.print.assert_called_once()
 
     def test_unbin(self):
         c = self._console()
-        crypto.handle_command("unbin 01101000 01100101 01101100 01101100 01101111", c)
+        crypto.handle_command("dec bin 01101000 01100101 01101100 01101100 01101111", c)
         c.print.assert_called_once()
 
     def test_oct_encode(self):
         c = self._console()
-        crypto.handle_command("oct A", c)
+        crypto.handle_command("enc oct A", c)
         c.print.assert_called_once()
 
     def test_unoct(self):
         c = self._console()
-        crypto.handle_command("unoct 101 102 103", c)
+        crypto.handle_command("dec oct 101 102 103", c)
         c.print.assert_called_once()
 
-    def test_single_arg_not_command_treated_as_magic(self):
-        """A single unrecognised token should trigger magic decode."""
+    def test_single_arg_not_command_treated_as_unknown(self):
+        """A single unrecognised token should now report Unknown."""
         c = self._console()
         import base64
         encoded = base64.b64encode(b"hello world").decode()
-        # No sub-command prefix — should trigger magic path
         crypto.handle_command(encoded, c)
         c.print.assert_called_once()
