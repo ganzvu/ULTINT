@@ -12,7 +12,7 @@ class TestEndpointConstants:
         assert "graphql" in Endpoints.GRAPHQL_URL
 
     def test_i_api_base(self):
-        assert "i.instagram.com" in Endpoints.I_API_BASE
+        assert Endpoints.I_API_BASE.startswith("https://i.instagram.com")
 
     def test_login_url(self):
         assert "/accounts/login/" in Endpoints.LOGIN
