@@ -94,7 +94,9 @@ chmod +x ultint.py
 *Windows (PowerShell):*
 ```powershell
 if (!(Test-Path -Path $PROFILE)) { New-Item -ItemType File -Path $PROFILE -Force }
-Add-Content -Path $PROFILE -Value "function ultint { python.exe $(Get-Location)\ultint.py }"
+$ultintPath = "$(Get-Location)\ultint.py"
+$venvPath = "$(Get-Location)\venv\Scripts\python.exe"
+Add-Content -Path $PROFILE -Value "function ultint { & `"$venvPath`" `"$ultintPath`" `$args }"
 . $PROFILE
 ```
 
