@@ -184,7 +184,7 @@ def run_cracker(target_hash, console, deep=False):
             with console.status(f"[cyan]Querying {api_name}...[/cyan]"):
                 r = requests.get(url, timeout=5)
                 text = r.text.strip()
-                if text and len(text) < 100 and text.lower() not in ('', 'not found', 'error', 'none'):
+                if text and len(text) < 100 and 'ERROR CODE' not in text.upper() and text.lower() not in ('', 'not found', 'error', 'none', 'null', 'false'):
                     console.print(Panel(f"Password Found (Online): [bold green]{text}[/bold green]", title=f"🌐 {api_name}", border_style="green"))
                     return
         except: pass
