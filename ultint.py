@@ -8,7 +8,8 @@ if not hasattr(sys, 'real_prefix') and not (hasattr(sys, 'base_prefix') and sys.
     venv_python = os.path.join(venv_dir, 'Scripts', 'python.exe') if os.name == 'nt' else os.path.join(venv_dir, 'bin', 'python')
     
     if os.path.exists(venv_python):
-        os.execl(venv_python, venv_python, *sys.argv)
+        import subprocess
+        sys.exit(subprocess.call([venv_python, sys.argv[0]] + sys.argv[1:]))
 
 import cmd
 import argparse
@@ -26,7 +27,7 @@ console = Console()
 
 class UltintConsole(cmd.Cmd):
     intro = ""
-    prompt = "\001\033[1;36m\002ultint\001\033[0m\002 > "
+    prompt = "\001\033[1;36m\002ultint\001\033[0m\002 > " if os.name != 'nt' else "\033[1;36multint\033[0m > "
 
     def preloop(self):
         from rich.console import Group

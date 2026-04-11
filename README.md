@@ -82,13 +82,22 @@ Need to dig deeper? Seamlessly switch from standard OSINT into our heavy-duty Da
    ```
 
 ### 🌍 Global Execution (Highly Recommended)
-ULTINT features a smart process-switcher! If you create a symbolic link into your PATH, the script will automatically switch into its isolated `venv` no matter where you currently are in the terminal:
+ULTINT features a smart process-switcher! You can alias the script globally into your PATH, and it will automatically dive into its isolated `venv` no matter where you currently are in the terminal:
 
+*Linux/macOS (Bash/Zsh):*
 ```bash
 mkdir -p ~/.local/bin
 ln -sf $(pwd)/ultint.py ~/.local/bin/ultint
 chmod +x ultint.py
 ```
+
+*Windows (PowerShell):*
+```powershell
+if (!(Test-Path -Path $PROFILE)) { New-Item -ItemType File -Path $PROFILE -Force }
+Add-Content -Path $PROFILE -Value "function ultint { python.exe $(Get-Location)\ultint.py }"
+. $PROFILE
+```
+
 *You can now simply type `ultint` anywhere in your terminal to boot the UI!*
 
 ---
