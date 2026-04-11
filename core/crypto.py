@@ -124,67 +124,128 @@ def magic_decode(data, max_depth=5):
     return results
 
 # ==========================================
-# Crack Engine 
+# Crack Engine — 3-Tier Escalation 
 # ==========================================
-LEET_MAP = {'a': ['@', '4'], 'e': ['3'], 'i': ['1', '!'], 'o': ['0'], 's': ['$', '5'], 't': ['7'], 'l': ['1'], 'g': ['9']}
-COMMON_SUFFIXES = ['1', '12', '123', '1234', '!', '@', '#', '!!', '69', '007', '01', '99']
-YEAR_RANGE = list(range(1990, 2027))
 
-def _mutate(word):
-    """Generator that yields rule-based mutations of a single word."""
-    # Rule 1: Capitalize first letter
-    yield word.capitalize()
-    # Rule 2: UPPERCASE
-    yield word.upper()
-    # Rule 3: Common number/symbol suffixes
-    for suffix in COMMON_SUFFIXES:
-        yield word + suffix
-        yield word.capitalize() + suffix
-    # Rule 4: Year appends
-    for year in YEAR_RANGE:
-        yield word + str(year)
-        yield word.capitalize() + str(year)
-    # Rule 5: Single-character l33t substitutions (first occurrence only)
-    lower = word.lower()
-    for char, replacements in LEET_MAP.items():
-        if char in lower:
-            for rep in replacements:
-                yield lower.replace(char, rep, 1)
-    # Rule 6: Reverse
+# Mutation Rules (Tier 3)
+LEET_MAP = {'a': '@', 'e': '3', 'i': '1', 'o': '0', 's': '$', 't': '7', 'l': '1', 'g': '9'}
+COMMON_SUFFIXES = ['', '1', '!', '123', '1234', '12345', '!', '!!', '@', '#', '0', '69', '007',
+                   '2020', '2021', '2022', '2023', '2024', '2025', '01', '99', '666', '777', '000']
+COMMON_PREFIXES = ['', '!', '@', '#', '1', 'the', 'my', 'i']
+
+def _generate_mutations(word):
+    """Yield mutated variants of a base word using common human password patterns."""
+    if not word or len(word) < 2:
+        return
+    
+    # --- Case Mutations ---
+    yield word.capitalize()              # password -> Password
+    yield word.upper()                   # password -> PASSWORD
+    yield word.lower()                   # Password -> password
+    yield word.swapcase()                # Password -> pASSWORD
+    # Title-case each "word" boundary
+    yield word.title()                   # hello world -> Hello World
+    
+    # --- Suffix Mutations (most common human behavior) ---
+    bases = [word, word.capitalize(), word.upper()]
+    for base in bases:
+        for suffix in COMMON_SUFFIXES:
+            if suffix:  # skip empty, already covered
+                yield base + suffix
+
+    # --- Prefix Mutations ---
+    for prefix in COMMON_PREFIXES:
+        if prefix:
+            yield prefix + word
+            yield prefix + word.capitalize()
+
+    # --- L33tspeak (single-pass replacement) ---
+    leet = word.lower()
+    for orig, repl in LEET_MAP.items():
+        leet = leet.replace(orig, repl)
+    if leet != word.lower():
+        yield leet
+        yield leet.capitalize()
+        for suffix in ['', '!', '1', '123']:
+            if suffix:
+                yield leet + suffix
+
+    # --- Reversal ---
     yield word[::-1]
+    yield word[::-1].capitalize()
+    
+    # --- Double word ---
+    yield word + word
+    yield word.capitalize() + word
+    
 
-def _hash_word(word, hash_type):
-    """Compute hash of a word for the given type. Returns hex digest."""
-    encoded = word.encode('utf-8', errors='ignore')
-    if hash_type == 'md5_or_ntlm':
-        return hashlib.md5(encoded).hexdigest()
-    elif hash_type == 'sha1':
-        return hashlib.sha1(encoded).hexdigest()
-    elif hash_type == 'sha256':
-        return hashlib.sha256(encoded).hexdigest()
-
-def _check_ntlm(word, target_hash):
-    """Check NTLM (MD4 of UTF-16LE) separately."""
+def _check_hash(candidate, target_hash, hash_type):
+    """Check a single candidate against the target hash. Returns candidate on match, else None."""
     try:
-        return hashlib.new('md4', word.encode('utf-16le')).hexdigest() == target_hash
-    except ValueError:
-        return False
-
-def run_cracker(target_hash, console, deep=False):
-    target_hash = target_hash.lower()
+        encoded = candidate.encode('utf-8', errors='ignore')
+    except Exception:
+        return None
     
-    # ── Phase 0: Online Rainbow Table API ──
-    if len(target_hash) == 32:
+    if hash_type == "md5_or_ntlm":
+        if hashlib.md5(encoded).hexdigest() == target_hash:
+            return candidate
         try:
-            with console.status("[cyan]Querying Nitrxgen Rainbow Tables...[/cyan]"):
-                r = requests.get(f"https://www.nitrxgen.net/md5db/{target_hash}", timeout=5)
-                text = r.text.strip()
-                if text and len(text) < 60:
-                    console.print(Panel(f"Password Found (Online): [bold green]{text}[/bold green]", title="🌐 Nitrxgen MD5 DB", border_style="green"))
-                    return
-        except: pass
+            if hashlib.new('md4', candidate.encode('utf-16le')).hexdigest() == target_hash:
+                return candidate
+        except (ValueError, UnicodeEncodeError):
+            pass
+    elif hash_type == "sha1":
+        if hashlib.sha1(encoded).hexdigest() == target_hash:
+            return candidate
+    elif hash_type == "sha256":
+        if hashlib.sha256(encoded).hexdigest() == target_hash:
+            return candidate
+    return None
+
+
+def run_cracker(target_hash, console):
+    target_hash = target_hash.strip().lower()
     
-    # ── Phase 1: Ensure RockYou wordlist ──
+    # ── Determine hash type ──
+    hash_type = "Unknown"
+    if len(target_hash) == 32:   hash_type = "md5_or_ntlm"
+    elif len(target_hash) == 40: hash_type = "sha1"
+    elif len(target_hash) == 64: hash_type = "sha256"
+
+    if hash_type == "Unknown":
+        console.print("[red]Hash length not recognized. Supported: MD5 (32), SHA1 (40), SHA256 (64).[/red]")
+        return
+
+    hash_label = hash_type.upper().replace("_OR_", " / ")
+    console.print(f"[dim]Detected hash type: [bold]{hash_label}[/bold] ({len(target_hash)} chars)[/dim]\n")
+
+    # ══════════════════════════════════════════
+    # TIER 1: Online Rainbow Table APIs (Instant)
+    # ══════════════════════════════════════════
+    with console.status("[cyan]⚡ Tier 1: Querying Online Rainbow Tables...[/cyan]"):
+        api_endpoints = []
+        if hash_type == "md5_or_ntlm":
+            api_endpoints = [
+                ("Nitrxgen", f"https://www.nitrxgen.net/md5db/{target_hash}"),
+            ]
+            
+        for name, url in api_endpoints:
+            try:
+                r = requests.get(url, timeout=5, headers={'User-Agent': 'ULTINT/1.0'})
+                result = r.text.strip()
+                # Nitrxgen returns empty string on miss, plain password on hit
+                if result and len(result) < 64 and ' ' not in result:
+                    console.print(Panel(
+                        f"Password Found: [bold green]{result}[/bold green]\n[dim]Source: {name} Rainbow Table[/dim]",
+                        title="⚡ Tier 1 — Instant Crack!", border_style="green"))
+                    return
+            except Exception:
+                pass
+    console.print("[dim]Tier 1: No match in online databases.[/dim]")
+
+    # ══════════════════════════════════════════
+    # TIER 2: Straight Dictionary (RockYou 14.3M)
+    # ══════════════════════════════════════════
     wordlist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
     os.makedirs(wordlist_dir, exist_ok=True)
     wordlist_path = os.path.join(wordlist_dir, 'rockyou.txt')
@@ -193,71 +254,59 @@ def run_cracker(target_hash, console, deep=False):
         with console.status("[cyan]First time setup: Downloading 134MB RockYou Dictionary...[/cyan]"):
             try:
                 r = requests.get("https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt", stream=True)
+                total = int(r.headers.get('content-length', 0))
+                downloaded = 0
                 with open(wordlist_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192):
+                    for chunk in r.iter_content(chunk_size=65536):
                         f.write(chunk)
-                console.print("[green]RockYou downloaded![/green]")
+                        downloaded += len(chunk)
+                console.print(f"[green]RockYou downloaded! ({downloaded // 1048576} MB)[/green]")
             except Exception as e:
                 console.print(f"[red]Failed to download wordlist: {e}[/red]")
                 return
 
-    # ── Determine hash type ──
-    hash_type = "Unknown"
-    if len(target_hash) == 32: hash_type = "md5_or_ntlm"
-    elif len(target_hash) == 40: hash_type = "sha1"
-    elif len(target_hash) == 64: hash_type = "sha256"
-
-    if hash_type == "Unknown":
-        console.print("[red]Hash length not recognized as MD5, SHA1, or SHA256.[/red]")
-        return
-
-    # ── Phase 2: Standard Dictionary Sweep ──
-    count = 0
-    with console.status(f"[cyan]Phase 1/2: Standard dictionary sweep ({hash_type})...[/cyan]"):
+    with console.status(f"[cyan]🔥 Tier 2: Straight dictionary attack (14.3M passwords)...[/cyan]"):
         with open(wordlist_path, 'r', encoding='latin-1') as f:
             for line in f:
                 word = line.rstrip('\n')
-                if not word: continue
-                count += 1
-                digest = _hash_word(word, hash_type)
-                if digest == target_hash:
-                    console.print(Panel(f"Password Found: [bold green]{word}[/bold green]", title="🔓 Cracked!", border_style="green"))
+                result = _check_hash(word, target_hash, hash_type)
+                if result:
+                    console.print(Panel(
+                        f"Password Found: [bold green]{result}[/bold green]\n[dim]Source: RockYou Straight Dictionary[/dim]",
+                        title="🔥 Tier 2 — Dictionary Hit!", border_style="green"))
                     return
-                if hash_type == 'md5_or_ntlm' and _check_ntlm(word, target_hash):
-                    console.print(Panel(f"Password Found (NTLM): [bold green]{word}[/bold green]", title="🔓 Cracked!", border_style="green"))
-                    return
-    
-    console.print(f"[yellow]Standard sweep complete ({count:,} words). No match.[/yellow]")
-    
-    if not deep:
-        console.print("[dim]Tip: Run [bold]crypto crack <hash> --deep[/bold] to enable mutation rules (~100M permutations).[/dim]")
-        return
+    console.print("[dim]Tier 2: No straight dictionary match.[/dim]")
 
-    # ── Phase 3: Deep Mutation Attack ──
-    console.print("[bold magenta]Engaging Deep Mutation Engine...[/bold magenta]")
-    mutations_tested = 0
-    with console.status(f"[cyan]Phase 2/2: Mutating 14.3M words with rules (est. ~100M permutations)...[/cyan]"):
+    # ══════════════════════════════════════════
+    # TIER 3: Deep Mutation Engine (Top 50k × Rules)
+    # ══════════════════════════════════════════
+    with console.status("[cyan]🧬 Tier 3: Deep mutation engine (Top 50k × rule mangling)...[/cyan]"):
+        seen = set()
+        count = 0
+        max_base_words = 50000
+        
         with open(wordlist_path, 'r', encoding='latin-1') as f:
             for line in f:
+                if count >= max_base_words:
+                    break
                 base_word = line.rstrip('\n')
-                if not base_word: continue
-                for mutated in _mutate(base_word):
-                    mutations_tested += 1
-                    digest = _hash_word(mutated, hash_type)
-                    if digest == target_hash:
+                if not base_word or len(base_word) < 2:
+                    continue
+                count += 1
+                
+                for mutant in _generate_mutations(base_word):
+                    if mutant in seen:
+                        continue
+                    seen.add(mutant)
+                    result = _check_hash(mutant, target_hash, hash_type)
+                    if result:
                         console.print(Panel(
-                            f"Password Found: [bold green]{mutated}[/bold green]\n[dim]Base word: {base_word} | Mutations tested: {mutations_tested:,}[/dim]",
-                            title="🔓 Deep Crack!", border_style="green"
-                        ))
+                            f"Password Found: [bold green]{result}[/bold green]\n[dim]Source: Mutation of base word '[bold]{base_word}[/bold]'[/dim]",
+                            title="🧬 Tier 3 — Mutation Crack!", border_style="green"))
                         return
-                    if hash_type == 'md5_or_ntlm' and _check_ntlm(mutated, target_hash):
-                        console.print(Panel(
-                            f"Password Found (NTLM): [bold green]{mutated}[/bold green]\n[dim]Base word: {base_word} | Mutations tested: {mutations_tested:,}[/dim]",
-                            title="🔓 Deep Crack!", border_style="green"
-                        ))
-                        return
-    
-    console.print(f"[yellow]Deep mutation exhausted ({mutations_tested:,} permutations). Hash not cracked.[/yellow]")
+                        
+    console.print(f"[yellow]All 3 tiers exhausted. Hash [bold]{target_hash}[/bold] not cracked.[/yellow]")
+    console.print("[dim]Tip: Try providing a custom wordlist in data/ or use hashcat for GPU-accelerated attacks.[/dim]")
 
 # ==========================================
 # CLI Handler
@@ -291,11 +340,9 @@ def handle_command(arg_str, console):
     # CRACK MODE
     if cmd == 'crack':
         if len(args) < 2:
-            console.print("[red]Usage: crypto crack <hash> [--deep][/red]")
+            console.print("[red]Usage: crypto crack <hash>[/red]")
             return
-        deep = '--deep' in args
-        target = [a for a in args[1:] if a != '--deep'][0]
-        run_cracker(target, console, deep=deep)
+        run_cracker(args[1], console)
         return
         
     # EXPLICIT MODES (enc, dec, hash)
