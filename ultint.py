@@ -62,13 +62,14 @@ class UltintConsole(cmd.Cmd):
 
     def do_recon(self, arg):
         """
-        Network and Reconnaissance functions
-        Usage: recon <subcommand> <args>
+        Automated Infrastructure Reconnaissance
+        Usage: recon <subcommand> <target>
         Subcommands:
-            whois <domain>  : Get WHOIS info
-            nmap <ip>       : Run basic targeted nmap
-            idb <ip>        : Retrieve Shodan InternetDB data without API keys
-            wayback <domain>: Extract historically archived endpoints via CDX
+            scan <ip/domain>    : Full 6-phase automated recon pipeline
+                                  (DNS, GeoIP, Shodan, WHOIS, Headers, Nmap)
+            dns <domain>        : Deep DNS enumeration + subdomain discovery via CT logs
+            headers <domain>    : HTTP header fingerprinting + security audit
+            wayback <domain>    : Wayback Machine ghost endpoints + API/admin panel detection
         """
         recon.handle_command(arg, console)
 
