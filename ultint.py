@@ -22,6 +22,8 @@ import core.crypto as crypto
 import core.recon as recon
 import core.forensics as forensics
 import core.social as social
+import core.github_osint as github_osint
+import core.reddit_osint as reddit_osint
 
 console = Console()
 
@@ -35,7 +37,7 @@ class UltintConsole(cmd.Cmd):
         
         banner_group = Group(
             Text(banner_text, style="bold cyan"),
-            Text.from_markup("[bold white]The Ultimate OSINT & Forensics Interactive Platform[/bold white]"),
+            Text.from_markup("[bold white]The Ultimate Intelligence Toolkit — OSINT • Forensics • Cryptanalysis[/bold white]"),
             Text.from_markup("[dim]Type 'help' or '?' to list commands.[/dim]")
         )
         
@@ -95,14 +97,36 @@ class UltintConsole(cmd.Cmd):
         """
         social.handle_command(arg, console)
 
+    def do_github(self, arg):
+        """
+        GitHub OSINT Pipeline (Keyless)
+        Usage: github <username>
+        Automated 5-phase scan:
+            Profile intel, commit email harvesting, tech stack profiling,
+            organization membership, SSH/GPG key enumeration
+        """
+        github_osint.handle_command(arg, console)
+
+    def do_reddit(self, arg):
+        """
+        Reddit OSINT Pipeline (Keyless)
+        Usage: reddit <username>
+        Automated 6-phase scan:
+            Profile metadata, post/comment history, subreddit activity map,
+            temporal sleep cycle analysis, PII leakage scanner, writing style
+        """
+        reddit_osint.handle_command(arg, console)
+
     def do_instagram(self, arg):
         """
         Deep Instagram Analysis Sub-Shell (IG-Detective)
         Usage: instagram
+        Automated OSINT: profile intel, GPS extraction, temporal analysis,
+        social network graphing, stylometry, surveillance, data export
         """
         try:
-            from src.cli.shell import IGDetectiveShell
-            from src.api.client import InstagramClient
+            from core.ig.shell import IGDetectiveShell
+            from core.ig.client import InstagramClient
         except ImportError as e:
             console.print(f"[red]Missing IG-Detective dependencies: {e}. Have you run pip install yet?[/red]")
             return
@@ -111,7 +135,7 @@ class UltintConsole(cmd.Cmd):
         console.print("[bold magenta]Transitioning to IG-Detective Sub-Shell[/bold magenta]")
         console.print("[dim]Type 'exit' to return to ULTINT.[/dim]")
         
-        client = InstagramClient() # Default to guest, users can auth if needed inside
+        client = InstagramClient()
         shell = IGDetectiveShell(client)
         try:
             shell.cmdloop()
@@ -136,7 +160,7 @@ class UltintConsole(cmd.Cmd):
         console.clear()
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="ULTINT Local OSINT Console")
+    parser = argparse.ArgumentParser(description="ULTINT — The Ultimate Intelligence Toolkit")
     # For now, we only launch the interactive shell
     args = parser.parse_args()
     
