@@ -75,10 +75,18 @@ class UltintConsole(cmd.Cmd):
     def do_forensics(self, arg):
         """
         Forensics and File Analysis
-        Usage: forensics <subcommand> <args>
+        Usage: forensics <subcommand> <file> [options]
         Subcommands:
-            exif <file>    : Run exiftool on file
-            strings <file> : Extract strings from file
+            exif <file>                              : Extract EXIF metadata (GPS, camera, software)
+            strings <file>                           : Extract strings + auto-detect flags/URLs
+            steghide extract <file> [passphrase]     : Extract hidden steganographic data
+            steghide info <file>                     : Analyze steganographic embed capacity
+            steghide embed <cover> <secret> [pass]   : Embed secret data into cover file
+            binwalk <file>                           : Scan for embedded file signatures
+            filetype <file>                          : Identify true file type via magic bytes
+            hexdump <file>                           : Hex dump first 256 bytes
+            hash <file>                              : Compute MD5, SHA-1, SHA-256 hashes
+            entropy <file>                           : Shannon entropy analysis (detect encryption)
         """
         forensics.handle_command(arg, console)
 

@@ -159,16 +159,29 @@ def _generate_mutations(word):
             yield prefix + word
             yield prefix + word.capitalize()
 
-    # --- L33tspeak (single-pass replacement) ---
-    leet = word.lower()
-    for orig, repl in LEET_MAP.items():
-        leet = leet.replace(orig, repl)
-    if leet != word.lower():
-        yield leet
-        yield leet.capitalize()
-        for suffix in ['', '!', '1', '123']:
-            if suffix:
-                yield leet + suffix
+    # --- L33tspeak (combinatorial per-character substitution) ---
+    # For each character that has a leet mapping, branch into (original, replacement)
+    # This generates partial substitutions like yuliana -> yul1ana (only i->1)
+    lower = word.lower()
+    leet_positions = []  # list of (index, original_char, replacement_char)
+    for idx, ch in enumerate(lower):
+        if ch in LEET_MAP:
+            leet_positions.append((idx, ch, LEET_MAP[ch]))
+    
+    if leet_positions:
+        # Cap combinatorial explosion: max 6 substitutable positions (2^6 = 64 combos)
+        leet_positions = leet_positions[:6]
+        for mask in range(1, 2 ** len(leet_positions)):
+            chars = list(lower)
+            for bit, (idx, orig, repl) in enumerate(leet_positions):
+                if mask & (1 << bit):
+                    chars[idx] = repl
+            variant = ''.join(chars)
+            if variant != lower:
+                yield variant
+                yield variant.capitalize()
+                for suffix in ['!', '1', '123']:
+                    yield variant + suffix
 
     # --- Reversal ---
     yield word[::-1]
