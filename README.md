@@ -32,23 +32,38 @@ High-performance OSINT hunting engines.
 
 ### 🔭 3. Active & Passive Recon (`recon`)
 Infrastructure mapping tools designed to stay completely stealthy.
-* **Keyless Shodan (`idb`)**: Instantly retrieve vulnerable open ports and CVEs against any IP Address absolutely free, utilizing the unauthenticated Shodan InternetDB lookup.
+* **Full Automated Scan (`scan`)**: One command triggers a 6-phase pipeline — DNS resolution, GeoIP intelligence, Shodan InternetDB (keyless CVE/port lookup), WHOIS/RDAP, HTTP header fingerprinting, and a fast `nmap` sweep.
+* **Deep DNS Enumeration (`dns`)**: Queries all standard record types (A, AAAA, MX, NS, TXT, SOA, CNAME) and harvests subdomains from Certificate Transparency logs.
+* **HTTP Header Audit (`headers`)**: Fingerprints server technology and checks for missing security headers (CSP, HSTS, X-Frame-Options, etc.).
 * **Wayback CDX (`wayback`)**: Rips historical URLs and ghost-endpoints from Archive.org.
-* **Standard Tooling**: Seamless OS wrappers for `nmap` port scanning and `whois`.
 
 ### 🔬 4. Local Forensics (`forensics`)
-* **Metadata Parsing (`exif`)**: Cleanly wraps local `exiftool` binaries to dump visual device signatures into beautifully formatted Rich tables.
-* **Strings Extraction (`str`)**: Wraps `strings` to identify embedded flag formats in suspected malware binaries.
+* **Full Automated Analysis (`analyze`)**: A 7-phase forensic pipeline — file type/magic-byte identification, multi-hash computation (MD5/SHA-1/SHA-256), Shannon entropy analysis, EXIF metadata extraction, steghide auto-crack with common passphrases, binwalk embedded-file detection, and strings intelligence (flags, URLs, credentials).
+* **Steghide Brute-Force (`stegcrack`)**: Runs a full dictionary attack against a steghide-embedded file using the RockYou wordlist when quick auto-crack fails.
 
 ### 🕵️ 5. IG-Detective Sub-Shell (`instagram`)
-Need to dig deeper? Seamlessly switch from standard OSINT into our heavy-duty Data Science framework perfectly designed for analyzing Instagram Data Export JSONs:
-* **Stylometry**: Natural Language Processing (NLTK) linguistics to profile a user's language patterns.
-* **Social Network Analysis (SNA)**: Identifies the target's "Inner Circle" via NetworkX graph charting.
-* **Temporal Intelligence**: Machine Learning (DBSCAN) spatial anomaly detection to unearth the target's precise timezone and biological sleep schedule.
+Need to dig deeper? Seamlessly switch from standard OSINT into our heavy-duty Data Science framework perfectly designed for live Instagram profile investigation:
+* **Profile Recon (`info`)**: Scrapes public profile metadata, hidden business emails, and external IDs.
+* **Timeline Analysis (`posts`)**: Fetches recent posts and computes aggregate engagement statistics.
+* **Location Extraction (`addrs`)**: Pulls GPS coordinates from post metadata and reverse-geocodes them to addresses.
+* **Data Export (`data`)**: Archives posts, followers, following, and stories into a local ZIP file.
+* **Active Surveillance (`surveillance`)**: Continuously monitors a profile for follower/following diffs, media uploads, and bio changes using Poisson-jittered polling to evade detection.
+* **Stylometry (`stylometry`)**: Natural Language Processing (NLTK) linguistics to profile a user's language patterns via n-grams, emoji usage, and punctuation habits.
+* **Social Network Analysis (`sna`)**: Identifies the target's "Inner Circle" via NetworkX graph charting of tagged interactions.
+* **Temporal Intelligence (`temporal`)**: Machine Learning (DBSCAN) spatial anomaly detection to unearth the target's precise timezone and biological sleep schedule.
 
 ---
 
 ## 🚀 Installation & Setup
+
+### ⚡ Quick Install (Linux/macOS)
+```bash
+git clone https://github.com/ganzvu/ULTINT.git
+cd ULTINT
+chmod +x install.sh && ./install.sh
+```
+
+### Manual Setup
 
 1. **Clone the Repository**
    ```bash
@@ -119,11 +134,15 @@ Inside the console, you will be presented with a persistent `ultint >` shell.
 **Quick Commands for NCL:**
 - `crypto crack 5eba2a3bd512a865668e21ab1701b97b` - Executes the dictionary attack engine.
 - `crypto magic 566d307764475668636e4a30` - Attempts auto-recursive decryption.
-- `crypto enc xor my_super_secret_key <data>` - Executes an XOR rolling cipher.
-- `recon idb 8.8.8.8` - Instantly returns open ports without ever touching the target server.
+- `crypto xor my_super_secret_key <data>` - Executes an XOR rolling cipher.
+- `recon scan 8.8.8.8` - Runs the full 6-phase automated infrastructure scan.
+- `recon dns example.com` - Deep DNS enumeration + subdomain discovery.
+- `recon headers example.com` - HTTP header fingerprinting and security audit.
+- `recon wayback example.com` - Scrapes historical ghost endpoints from Archive.org.
 - `social email target@gmail.com` - Checks database leaks and APIs for account registrations.
 - `social username JohnDoe123` - Sweeps 400+ platforms for account hits in under 5 seconds.
-- `forensics exif suspect_image.jpg` - Dumps the embedded camera metadata.
+- `forensics analyze suspect_image.jpg` - Runs the full 7-phase forensic analysis pipeline.
+- `forensics stegcrack suspect_image.jpg` - Dictionary brute-force against steghide-embedded file.
 - `instagram` - Swaps your shell into the IG-Detective NLP/Data Science mode.
 - `help` / `exit` - Print the help menu or kill the shell.
 
@@ -133,15 +152,42 @@ Inside the console, you will be presented with a persistent `ultint >` shell.
 ```text
 ULTINT/
 ├── ultint.py          # The core REPL shell and venv-switcher.
+├── install.sh         # One-command installer (Linux/macOS).
 ├── requirements.txt   # Global dependency manifest.
 ├── core/
-│   ├── crypto.py      # Cryptography UI, BFS Magic algorithm, Hash Cracker.
-│   ├── recon.py       # Shodan IDB, Wayback CDX, Nmap APIs.
-│   ├── forensics.py   # System binary wrappers (exiftool, strings).
-│   └── social.py      # Asyncio Sherlock framework and Email trappers.
-└── tests/             # Deep Pytest implementation suite.
-└── src/               # The raw Data Science & NLP engine (Imported from IG-Detective).
+│   ├── crypto.py          # Cryptography UI, BFS Magic algorithm, Hash Cracker.
+│   ├── recon.py           # 6-phase infrastructure scan, DNS enum, Header audit, Wayback CDX.
+│   ├── forensics.py       # 7-phase forensic pipeline, Steghide brute-force.
+│   ├── social.py          # Asyncio Sherlock engine and silent Email trappers.
+│   └── sherlock_data.json # Platform definitions for the username OSINT engine.
+├── src/               # IG-Detective Data Science & NLP engine.
+│   ├── api/
+│   │   ├── auth.py        # Session/cookie authentication handler.
+│   │   ├── client.py      # Instagram API client (guest + authenticated).
+│   │   └── endpoints.py   # Raw API endpoint definitions.
+│   ├── cli/
+│   │   ├── shell.py       # IGDetectiveShell (cmd2 interactive sub-shell).
+│   │   └── formatters.py  # Rich console output formatters and splash screens.
+│   ├── core/
+│   │   ├── models.py      # Pydantic data models (User, Post, Location).
+│   │   ├── cache.py       # On-disk caching layer.
+│   │   ├── config.py      # Runtime configuration management.
+│   │   └── exceptions.py  # Custom exception hierarchy.
+│   └── modules/
+│       ├── recon.py       # Profile scraping and post/location extraction.
+│       ├── analytics.py   # Temporal DBSCAN, SNA (NetworkX), Stylometry (NLTK).
+│       ├── surveillance.py# Real-time profile change monitoring.
+│       ├── evasion.py     # Poisson jitter and anti-detection utilities.
+│       └── exporter.py    # ZIP data export engine.
+└── tests/             # Pytest test suite.
 ```
 
 ## 📜 License
 *Educational and Competitive Forensic use only. Always respect Platform Terms of Service and applicable privacy laws when deployed outside of authorized sandbox environments.*
+
+---
+
+## 🧪 Running Tests
+```bash
+python3 -m pytest
+```
