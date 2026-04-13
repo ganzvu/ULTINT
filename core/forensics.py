@@ -1,389 +1,357 @@
 import subprocess
 import os
 import hashlib
+import math
+import shutil
 from rich.table import Table
 from rich.panel import Panel
-from rich.columns import Columns
-from rich.text import Text
 
 def handle_command(arg_str, console):
     args = arg_str.split()
     if not args:
-        console.print("[yellow]Usage: forensics <subcommand> <file> [options][/yellow]")
-        console.print("[dim]Subcommands: exif, strings, steghide, binwalk, filetype, hexdump, hash, entropy[/dim]")
+        console.print("[yellow]Usage: forensics <subcommand> <file>[/yellow]")
+        console.print("[dim]Subcommands: analyze, stegcrack[/dim]")
         return
     
     subcmd = args[0]
-    
-    # --- Steghide requires special argument parsing ---
-    if subcmd == 'steghide':
-        _steghide(args[1:], console)
-        return
-
     target_file = " ".join(args[1:])
     
     if not target_file:
         console.print("[red]Please provide a target file path.[/red]")
         return
-        
-    if subcmd == 'exif':
-        _exif(target_file, console)
-    elif subcmd == 'strings':
-        _strings(target_file, console)
-    elif subcmd == 'binwalk':
-        _binwalk(target_file, console)
-    elif subcmd in ['filetype', 'file']:
-        _filetype(target_file, console)
-    elif subcmd in ['hexdump', 'hex', 'xxd']:
-        _hexdump(target_file, console)
-    elif subcmd == 'hash':
-        _hash_file(target_file, console)
-    elif subcmd == 'entropy':
-        _entropy(target_file, console)
-    else:
-        console.print(f"[red]Unknown forensics subcommand: {subcmd}[/red]")
-        console.print("[dim]Available: exif, strings, steghide, binwalk, filetype, hexdump, hash, entropy[/dim]")
-
-
-# ══════════════════════════════════════════
-# EXIF Metadata Extraction
-# ══════════════════════════════════════════
-def _exif(target_file, console):
-    try:
-        with console.status(f"[cyan]Extracting EXIF data from {target_file}...[/cyan]"):
-            result = subprocess.run(["exiftool", target_file], capture_output=True, text=True, timeout=15)
-            if result.returncode == 0:
-                table = Table(title=f"EXIF Metadata: {target_file}", show_lines=True)
-                table.add_column("Tag", style="cyan", min_width=25)
-                table.add_column("Value", style="green", overflow="fold")
-                
-                # Highlight GPS and suspicious fields
-                highlight_tags = ['gps', 'location', 'latitude', 'longitude', 'comment', 'author', 'creator', 'software']
-                for line in result.stdout.split('\n'):
-                    if ':' in line:
-                        parts = line.split(':', 1)
-                        tag = parts[0].strip()
-                        val = parts[1].strip()
-                        style = "bold yellow" if any(h in tag.lower() for h in highlight_tags) else "green"
-                        table.add_row(tag, f"[{style}]{val}[/{style}]")
-                console.print(table)
-            else:
-                console.print(f"[red]exiftool error: {result.stderr}[/red]")
-    except FileNotFoundError:
-        console.print("[yellow]'exiftool' not found. Install: `apt install libimage-exiftool-perl` (Linux) or download from exiftool.org (Windows).[/yellow]")
-    except Exception as e:
-        console.print(f"[bold red]Error[/bold red]: {e}")
-
-
-# ══════════════════════════════════════════
-# Strings Extraction
-# ══════════════════════════════════════════
-def _strings(target_file, console):
-    try:
-        with console.status(f"[cyan]Extracting strings from {target_file}...[/cyan]"):
-            result = subprocess.run(["strings", target_file], capture_output=True, text=True, timeout=15)
-            if result.returncode == 0:
-                lines = result.stdout.split('\n')
-                
-                # Auto-detect interesting patterns (flags, URLs, emails)
-                flag_patterns = []
-                for i, line in enumerate(lines):
-                    l_lower = line.lower()
-                    if any(p in l_lower for p in ['flag{', 'ctf{', 'key{', 'secret', 'password', 'http://', 'https://', '@', 'base64']):
-                        flag_patterns.append(f"[bold yellow]L{i+1}: {line}[/bold yellow]")
-                
-                preview = '\n'.join(lines[:30])
-                footer = f"\n... [dim]and {len(lines) - 30} more lines[/dim]" if len(lines) > 30 else ""
-                console.print(Panel(preview + footer, title=f"Strings (Top 30): {target_file}", border_style="blue"))
-                
-                if flag_patterns:
-                    console.print(Panel('\n'.join(flag_patterns[:15]), title="⚠️ Suspicious Patterns Detected", border_style="yellow"))
-            else:
-                console.print(f"[red]strings error: {result.stderr}[/red]")
-    except FileNotFoundError:
-        console.print("[yellow]'strings' utility not found on path.[/yellow]")
-    except Exception as e:
-        console.print(f"[bold red]Error[/bold red]: {e}")
-
-
-# ══════════════════════════════════════════
-# Steganography — Steghide
-# ══════════════════════════════════════════
-def _steghide(args, console):
-    """
-    Usage:
-        forensics steghide extract <file> [passphrase]   — Extract hidden data
-        forensics steghide info <file>                    — Show embed info
-        forensics steghide embed <cover> <secret> [pass]  — Embed data
-    """
-    if len(args) < 2:
-        console.print("[yellow]Usage:[/yellow]")
-        console.print("  forensics steghide extract <file> [passphrase]")
-        console.print("  forensics steghide info <file>")
-        console.print("  forensics steghide embed <cover_file> <secret_file> [passphrase]")
+    
+    if not os.path.exists(target_file):
+        console.print(f"[red]File not found: {target_file}[/red]")
         return
 
-    action = args[0]
-    
-    if action == 'info':
-        target = args[1]
-        try:
-            with console.status(f"[cyan]Analyzing steganographic profile of {target}...[/cyan]"):
-                result = subprocess.run(
-                    ["steghide", "info", target, "-f"],
-                    capture_output=True, text=True, timeout=15,
-                    input="\n"  # auto-answer no to extract prompt
-                )
-                output = result.stdout + result.stderr
-                console.print(Panel(output.strip(), title=f"Steghide Info: {target}", border_style="magenta"))
-        except FileNotFoundError:
-            console.print("[yellow]'steghide' not found. Install: `apt install steghide`[/yellow]")
-        except Exception as e:
-            console.print(f"[bold red]Error[/bold red]: {e}")
-
-    elif action == 'extract':
-        target = args[1]
-        passphrase = args[2] if len(args) > 2 else ""
-        try:
-            cmd = ["steghide", "extract", "-sf", target, "-f"]
-            if passphrase:
-                cmd += ["-p", passphrase]
-            else:
-                cmd += ["-p", ""]  # Try empty passphrase first
-
-            with console.status(f"[cyan]Attempting steghide extraction from {target}...[/cyan]"):
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-                output = result.stdout + result.stderr
-                if "wrote extracted data" in output.lower() or result.returncode == 0:
-                    console.print(Panel(f"[bold green]{output.strip()}[/bold green]", title="🔓 Steghide Extraction Success!", border_style="green"))
-                else:
-                    console.print(Panel(f"[yellow]{output.strip()}[/yellow]", title="Steghide Extraction", border_style="yellow"))
-                    if not passphrase:
-                        console.print("[dim]Tip: Try providing a passphrase: forensics steghide extract <file> <passphrase>[/dim]")
-        except FileNotFoundError:
-            console.print("[yellow]'steghide' not found. Install: `apt install steghide`[/yellow]")
-        except Exception as e:
-            console.print(f"[bold red]Error[/bold red]: {e}")
-
-    elif action == 'embed':
-        if len(args) < 3:
-            console.print("[red]Usage: forensics steghide embed <cover_file> <secret_file> [passphrase][/red]")
-            return
-        cover = args[1]
-        secret = args[2]
-        passphrase = args[3] if len(args) > 3 else ""
-        try:
-            cmd = ["steghide", "embed", "-cf", cover, "-ef", secret, "-f"]
-            if passphrase:
-                cmd += ["-p", passphrase]
-            else:
-                cmd += ["-p", ""]
-            with console.status(f"[cyan]Embedding {secret} into {cover}...[/cyan]"):
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-                output = result.stdout + result.stderr
-                console.print(Panel(output.strip(), title="Steghide Embed", border_style="magenta"))
-        except FileNotFoundError:
-            console.print("[yellow]'steghide' not found. Install: `apt install steghide`[/yellow]")
-        except Exception as e:
-            console.print(f"[bold red]Error[/bold red]: {e}")
+    if subcmd == 'analyze':
+        _full_analysis(target_file, console)
+    elif subcmd == 'stegcrack':
+        _steg_bruteforce(target_file, console)
     else:
-        console.print(f"[red]Unknown steghide action: {action}. Use: info, extract, embed[/red]")
+        console.print(f"[red]Unknown subcommand: {subcmd}. Use: analyze, stegcrack[/red]")
 
 
-# ══════════════════════════════════════════
-# Binwalk — Firmware / Embedded File Carving
-# ══════════════════════════════════════════
-def _binwalk(target_file, console):
+def _has_tool(name):
+    """Check if a system tool is available on PATH."""
+    return shutil.which(name) is not None
+
+
+def _run(cmd, timeout=15, stdin_data=None):
+    """Run a subprocess and return (success, stdout, stderr)."""
     try:
-        with console.status(f"[cyan]Running binwalk signature scan on {target_file}...[/cyan]"):
-            result = subprocess.run(["binwalk", target_file], capture_output=True, text=True, timeout=30)
-            if result.returncode == 0 and result.stdout.strip():
-                table = Table(title=f"Binwalk Scan: {target_file}", show_lines=True)
-                table.add_column("Offset", style="cyan", min_width=12)
-                table.add_column("Type", style="green")
-                table.add_column("Description", style="white", overflow="fold")
-                
-                for line in result.stdout.strip().split('\n'):
-                    # Skip header lines
-                    if line.startswith('DECIMAL') or line.startswith('---'):
-                        continue
-                    parts = line.split(None, 2)
-                    if len(parts) >= 3:
-                        table.add_row(parts[0], parts[1] if len(parts) > 1 else "", parts[2] if len(parts) > 2 else "")
-                    elif parts:
-                        table.add_row(parts[0], "", " ".join(parts[1:]) if len(parts) > 1 else "")
-                console.print(table)
-                console.print("[dim]Tip: Run `binwalk -e <file>` manually to auto-extract embedded files.[/dim]")
-            else:
-                console.print(f"[yellow]No embedded signatures found in {target_file}.[/yellow]")
-    except FileNotFoundError:
-        console.print("[yellow]'binwalk' not found. Install: `apt install binwalk` or `pip install binwalk`[/yellow]")
-    except Exception as e:
-        console.print(f"[bold red]Error[/bold red]: {e}")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, input=stdin_data)
+        return result.returncode == 0, result.stdout, result.stderr
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False, "", ""
 
 
-# ══════════════════════════════════════════
-# File Type Identification (magic bytes)
-# ══════════════════════════════════════════
-def _filetype(target_file, console):
-    try:
-        with console.status(f"[cyan]Identifying file type for {target_file}...[/cyan]"):
-            # Run `file` command for magic byte analysis
-            result = subprocess.run(["file", "-b", target_file], capture_output=True, text=True, timeout=10)
-            file_type = result.stdout.strip() if result.returncode == 0 else "Unknown"
-            
-            # Also get MIME type
-            result_mime = subprocess.run(["file", "-b", "--mime-type", target_file], capture_output=True, text=True, timeout=10)
-            mime = result_mime.stdout.strip() if result_mime.returncode == 0 else "Unknown"
-            
-            # File size
-            size = os.path.getsize(target_file)
-            if size > 1048576:
-                size_str = f"{size / 1048576:.2f} MB"
-            elif size > 1024:
-                size_str = f"{size / 1024:.2f} KB"
-            else:
-                size_str = f"{size} bytes"
-            
-            # Read magic bytes (first 16 bytes hex)
-            with open(target_file, 'rb') as f:
-                magic = f.read(16)
-            magic_hex = ' '.join(f'{b:02x}' for b in magic)
-            
-            table = Table(title=f"File Analysis: {target_file}", show_lines=True)
-            table.add_column("Property", style="cyan", min_width=15)
-            table.add_column("Value", style="green", overflow="fold")
-            table.add_row("File Type", file_type)
-            table.add_row("MIME Type", mime)
-            table.add_row("File Size", size_str)
-            table.add_row("Magic Bytes", magic_hex)
-            
-            # Check for extension mismatch (common CTF trick)
-            ext = os.path.splitext(target_file)[1].lower()
-            warned = False
-            if ext in ['.jpg', '.jpeg'] and 'jpeg' not in file_type.lower():
-                table.add_row("⚠️ WARNING", "[bold red]Extension says JPEG but magic bytes disagree![/bold red]")
-                warned = True
-            elif ext == '.png' and 'png' not in file_type.lower():
-                table.add_row("⚠️ WARNING", "[bold red]Extension says PNG but magic bytes disagree![/bold red]")
-                warned = True
-            elif ext == '.pdf' and 'pdf' not in file_type.lower():
-                table.add_row("⚠️ WARNING", "[bold red]Extension says PDF but magic bytes disagree![/bold red]")
-                warned = True
-            
-            console.print(table)
-    except FileNotFoundError:
-        if not os.path.exists(target_file):
-            console.print(f"[red]File not found: {target_file}[/red]")
-        else:
-            console.print("[yellow]'file' command not found on path.[/yellow]")
-    except Exception as e:
-        console.print(f"[bold red]Error[/bold red]: {e}")
+# ══════════════════════════════════════════════════
+# Full Automated Analysis Pipeline
+# ══════════════════════════════════════════════════
+def _full_analysis(target_file, console):
+    """
+    The core value of ULTINT forensics: throw a file at it and let
+    the engine automatically run every relevant analysis tool in sequence,
+    surfacing only actionable intelligence.
+    """
+    findings = []  # Collect important discoveries to summarize at end
+    
+    console.print(Panel(f"[bold]Target: {target_file}[/bold]", title="🔬 ULTINT Forensic Analysis", border_style="cyan"))
 
-
-# ══════════════════════════════════════════
-# Hex Dump (first 256 bytes)
-# ══════════════════════════════════════════
-def _hexdump(target_file, console):
-    try:
+    # ── Phase 1: File Identity ──────────────────────
+    with console.status("[cyan]Phase 1: Identifying file...[/cyan]"):
+        size = os.path.getsize(target_file)
+        size_str = f"{size / 1048576:.2f} MB" if size > 1048576 else f"{size / 1024:.2f} KB" if size > 1024 else f"{size} bytes"
+        
+        # Magic bytes
         with open(target_file, 'rb') as f:
-            data = f.read(256)
+            magic = f.read(16)
+        magic_hex = ' '.join(f'{b:02x}' for b in magic)
         
-        lines = []
-        for offset in range(0, len(data), 16):
-            chunk = data[offset:offset+16]
-            hex_part = ' '.join(f'{b:02x}' for b in chunk)
-            ascii_part = ''.join(chr(b) if 32 <= b < 127 else '.' for b in chunk)
-            lines.append(f"[cyan]{offset:08x}[/cyan]  {hex_part:<48}  [green]{ascii_part}[/green]")
+        # file command
+        file_type = "Unknown"
+        mime = "Unknown"
+        if _has_tool("file"):
+            ok, out, _ = _run(["file", "-b", target_file])
+            if ok: file_type = out.strip()
+            ok, out, _ = _run(["file", "-b", "--mime-type", target_file])
+            if ok: mime = out.strip()
         
-        console.print(Panel('\n'.join(lines), title=f"Hex Dump (first 256 bytes): {target_file}", border_style="blue"))
-    except FileNotFoundError:
-        console.print(f"[red]File not found: {target_file}[/red]")
-    except Exception as e:
-        console.print(f"[bold red]Error[/bold red]: {e}")
-
-
-# ══════════════════════════════════════════
-# File Hashing (integrity / lookup)
-# ══════════════════════════════════════════
-def _hash_file(target_file, console):
-    try:
-        with console.status(f"[cyan]Computing file hashes for {target_file}...[/cyan]"):
-            md5 = hashlib.md5()
-            sha1 = hashlib.sha1()
-            sha256 = hashlib.sha256()
+        # Extension mismatch detection
+        ext = os.path.splitext(target_file)[1].lower()
+        mismatch = False
+        real_ext = ""
+        if 'jpeg' in file_type.lower() or 'jpg' in file_type.lower():
+            real_ext = ".jpg"
+        elif 'png' in file_type.lower():
+            real_ext = ".png"
+        elif 'pdf' in file_type.lower():
+            real_ext = ".pdf"
+        elif 'zip' in file_type.lower():
+            real_ext = ".zip"
+        elif 'gif' in file_type.lower():
+            real_ext = ".gif"
             
-            with open(target_file, 'rb') as f:
-                while True:
-                    chunk = f.read(65536)
-                    if not chunk:
-                        break
-                    md5.update(chunk)
-                    sha1.update(chunk)
-                    sha256.update(chunk)
-            
-            table = Table(title=f"File Hashes: {target_file}", show_lines=True)
-            table.add_column("Algorithm", style="cyan", min_width=10)
-            table.add_column("Hash", style="green")
-            table.add_row("MD5", md5.hexdigest())
-            table.add_row("SHA-1", sha1.hexdigest())
-            table.add_row("SHA-256", sha256.hexdigest())
-            console.print(table)
-            console.print("[dim]Tip: Search these hashes on VirusTotal to check for known malware.[/dim]")
-    except FileNotFoundError:
-        console.print(f"[red]File not found: {target_file}[/red]")
-    except Exception as e:
-        console.print(f"[bold red]Error[/bold red]: {e}")
+        if real_ext and ext and ext != real_ext and ext not in [real_ext]:
+            mismatch = True
+            findings.append(f"⚠️ EXTENSION MISMATCH: File is actually {real_ext.upper()} but named {ext}")
+    
+    table = Table(title="Phase 1: File Identity", show_lines=True)
+    table.add_column("Property", style="cyan", min_width=15)
+    table.add_column("Value", style="green", overflow="fold")
+    table.add_row("Size", size_str)
+    table.add_row("Type", file_type)
+    table.add_row("MIME", mime)
+    table.add_row("Magic Bytes", magic_hex)
+    if mismatch:
+        table.add_row("⚠️ WARNING", f"[bold red]Extension '{ext}' does not match detected type '{real_ext}'![/bold red]")
+    console.print(table)
 
+    # ── Phase 2: Hashing ────────────────────────────
+    with console.status("[cyan]Phase 2: Computing hashes...[/cyan]"):
+        md5 = hashlib.md5()
+        sha1 = hashlib.sha1()
+        sha256 = hashlib.sha256()
+        with open(target_file, 'rb') as f:
+            while True:
+                chunk = f.read(65536)
+                if not chunk: break
+                md5.update(chunk)
+                sha1.update(chunk)
+                sha256.update(chunk)
+    
+    table = Table(title="Phase 2: File Hashes", show_lines=True)
+    table.add_column("Algorithm", style="cyan")
+    table.add_column("Hash", style="green")
+    table.add_row("MD5", md5.hexdigest())
+    table.add_row("SHA-1", sha1.hexdigest())
+    table.add_row("SHA-256", sha256.hexdigest())
+    console.print(table)
 
-# ══════════════════════════════════════════
-# Entropy Analysis (detect encryption/compression)
-# ══════════════════════════════════════════
-def _entropy(target_file, console):
-    import math
-    try:
+    # ── Phase 3: Entropy ────────────────────────────
+    with console.status("[cyan]Phase 3: Entropy analysis...[/cyan]"):
         with open(target_file, 'rb') as f:
             data = f.read()
-        
-        if not data:
-            console.print("[red]File is empty.[/red]")
-            return
-        
-        # Shannon entropy calculation
         freq = [0] * 256
         for byte in data:
             freq[byte] += 1
-        
         entropy = 0.0
         for count in freq:
             if count > 0:
                 p = count / len(data)
                 entropy -= p * math.log2(p)
         
-        # Visual bar
         bar_len = 40
         filled = int((entropy / 8.0) * bar_len)
         bar = "█" * filled + "░" * (bar_len - filled)
         
-        # Interpretation
         if entropy > 7.5:
-            verdict = "[bold red]Very High — Likely encrypted or compressed data[/bold red]"
+            verdict = "Very High — Likely encrypted or compressed"
+            findings.append("🔒 High entropy detected: file may contain encrypted/compressed payload")
         elif entropy > 6.0:
-            verdict = "[bold yellow]High — Possibly compressed (ZIP, GZIP, etc.)[/bold yellow]"
+            verdict = "High — Possibly compressed (ZIP, GZIP)"
         elif entropy > 4.0:
-            verdict = "[bold green]Medium — Typical structured data (executables, documents)[/bold green]"
+            verdict = "Medium — Structured data"
         else:
-            verdict = "[bold cyan]Low — Likely plaintext or repetitive data[/bold cyan]"
-        
-        table = Table(title=f"Entropy Analysis: {target_file}", show_lines=True)
-        table.add_column("Property", style="cyan", min_width=15)
-        table.add_column("Value", style="green", overflow="fold")
-        table.add_row("File Size", f"{len(data):,} bytes")
-        table.add_row("Shannon Entropy", f"{entropy:.4f} / 8.0 bits")
-        table.add_row("Entropy Bar", bar)
-        table.add_row("Verdict", verdict)
-        console.print(table)
-    except FileNotFoundError:
-        console.print(f"[red]File not found: {target_file}[/red]")
-    except Exception as e:
-        console.print(f"[bold red]Error[/bold red]: {e}")
+            verdict = "Low — Plaintext or repetitive data"
+   
+    console.print(f"  [cyan]Entropy:[/cyan] {entropy:.4f}/8.0  {bar}  [dim]{verdict}[/dim]")
+
+    # ── Phase 4: EXIF (images only) ─────────────────
+    is_image = any(x in mime.lower() for x in ['image', 'jpeg', 'png', 'gif', 'tiff', 'bmp'])
+    
+    if is_image and _has_tool("exiftool"):
+        with console.status("[cyan]Phase 4: Extracting EXIF metadata...[/cyan]"):
+            ok, out, _ = _run(["exiftool", target_file])
+            if ok and out.strip():
+                table = Table(title="Phase 4: EXIF Metadata", show_lines=True)
+                table.add_column("Tag", style="cyan", min_width=25)
+                table.add_column("Value", style="green", overflow="fold")
+                
+                highlight_tags = ['gps', 'location', 'latitude', 'longitude', 'comment', 
+                                  'author', 'creator', 'software', 'description', 'subject', 'title']
+                for line in out.split('\n'):
+                    if ':' in line:
+                        parts = line.split(':', 1)
+                        tag, val = parts[0].strip(), parts[1].strip()
+                        if any(h in tag.lower() for h in highlight_tags):
+                            findings.append(f"📍 EXIF '{tag}': {val}")
+                            table.add_row(f"[bold yellow]{tag}[/bold yellow]", f"[bold yellow]{val}[/bold yellow]")
+                        else:
+                            table.add_row(tag, val)
+                console.print(table)
+    elif is_image:
+        console.print("[dim]Phase 4: Skipped EXIF (exiftool not installed)[/dim]")
+
+    # ── Phase 5: Steganography Auto-Crack ───────────
+    steg_compatible = any(x in mime.lower() for x in ['jpeg', 'jpg', 'bmp', 'wav', 'au'])
+    
+    if steg_compatible and _has_tool("steghide"):
+        console.print()
+        with console.status("[cyan]Phase 5: Attempting steghide extraction (common passphrases)...[/cyan]"):
+            common_passes = ["", "password", "123456", "secret", "admin", "flag", "ctf",
+                             "hidden", "stego", "pass", "steghide", "test", "1234",
+                             os.path.splitext(os.path.basename(target_file))[0],  # filename as password
+                             os.path.splitext(os.path.basename(target_file))[0].lower()]
+            
+            for pw in common_passes:
+                cmd = ["steghide", "extract", "-sf", target_file, "-p", pw, "-f"]
+                ok, out, err = _run(cmd)
+                combined = out + err
+                if ok and "wrote extracted data" in combined.lower():
+                    # Find what file was extracted
+                    for word in combined.split():
+                        if '.' in word and word != target_file:
+                            extracted = word.strip('"').strip("'")
+                            break
+                    else:
+                        extracted = "extracted data"
+                    
+                    pw_display = f"'{pw}'" if pw else "(empty passphrase)"
+                    findings.append(f"🔓 STEGHIDE: Hidden data extracted with passphrase {pw_display}!")
+                    console.print(Panel(
+                        f"[bold green]Hidden data extracted![/bold green]\n"
+                        f"Passphrase: {pw_display}\n"
+                        f"Output: {combined.strip()}",
+                        title="🔓 Phase 5: Steghide — DATA FOUND!", border_style="green"))
+                    
+                    # Auto-read the extracted file if it's text
+                    if os.path.exists(extracted):
+                        try:
+                            with open(extracted, 'r', errors='ignore') as ef:
+                                content = ef.read(1024)
+                            if content.strip():
+                                console.print(Panel(content.strip(), title=f"Contents of {extracted}", border_style="green"))
+                                findings.append(f"📄 Extracted content: {content.strip()[:200]}")
+                        except Exception:
+                            pass
+                    break
+            else:
+                console.print("[dim]Phase 5: Steghide — no data found with common passphrases.[/dim]")
+                console.print("[dim]  Tip: Run 'forensics stegcrack <file>' for a full dictionary attack.[/dim]")
+    elif steg_compatible:
+        console.print("[dim]Phase 5: Skipped steghide (not installed — apt install steghide)[/dim]")
+
+    # ── Phase 6: Binwalk Embedded Files ─────────────
+    if _has_tool("binwalk"):
+        with console.status("[cyan]Phase 6: Scanning for embedded files...[/cyan]"):
+            ok, out, _ = _run(["binwalk", target_file])
+            if ok and out.strip():
+                lines = [l for l in out.strip().split('\n') if l and not l.startswith('DECIMAL') and not l.startswith('---')]
+                if len(lines) > 1:  # More than just the file itself
+                    findings.append(f"📦 Binwalk found {len(lines)} embedded signatures")
+                    table = Table(title="Phase 6: Embedded Signatures", show_lines=True)
+                    table.add_column("Offset", style="cyan")
+                    table.add_column("Description", style="green", overflow="fold")
+                    for line in lines:
+                        parts = line.split(None, 2)
+                        if len(parts) >= 3:
+                            table.add_row(parts[0], parts[2])
+                        elif parts:
+                            table.add_row(parts[0], " ".join(parts[1:]))
+                    console.print(table)
+    else:
+        console.print("[dim]Phase 6: Skipped binwalk (not installed)[/dim]")
+
+    # ── Phase 7: Strings Intelligence ───────────────
+    if _has_tool("strings"):
+        with console.status("[cyan]Phase 7: Extracting strings intelligence...[/cyan]"):
+            ok, out, _ = _run(["strings", target_file])
+            if ok:
+                lines = out.split('\n')
+                # Auto-detect interesting patterns
+                patterns = {
+                    'flags': [], 'urls': [], 'emails': [], 'passwords': [],
+                    'base64': [], 'hidden_text': []
+                }
+                for line in lines:
+                    l = line.strip()
+                    if not l: continue
+                    ll = l.lower()
+                    if any(p in ll for p in ['flag{', 'ctf{', 'key{', 'picoctf{', 'htb{']):
+                        patterns['flags'].append(l)
+                    elif any(p in ll for p in ['http://', 'https://', 'ftp://']):
+                        patterns['urls'].append(l)
+                    elif '@' in l and '.' in l and len(l) < 100:
+                        patterns['emails'].append(l)
+                    elif any(p in ll for p in ['password', 'passwd', 'secret', 'credential']):
+                        patterns['passwords'].append(l)
+
+                intel_found = False
+                for category, items in patterns.items():
+                    if items:
+                        intel_found = True
+                        findings.append(f"🔍 Strings: Found {len(items)} {category}")
+                        for item in items[:5]:
+                            console.print(f"  [bold yellow]{category.upper()}:[/bold yellow] {item}")
+                
+                if not intel_found:
+                    console.print(f"[dim]Phase 7: {len(lines)} strings extracted, no obvious flags/URLs found.[/dim]")
+
+    # ── FINAL REPORT ────────────────────────────────
+    console.print()
+    if findings:
+        report = '\n'.join(f"  {f}" for f in findings)
+        console.print(Panel(report, title="📋 INTELLIGENCE SUMMARY", border_style="bold green"))
+    else:
+        console.print(Panel("[dim]No significant findings. File appears clean.[/dim]", 
+                           title="📋 Analysis Complete", border_style="dim"))
+
+
+# ══════════════════════════════════════════════════
+# Steghide Dictionary Brute-Force
+# ══════════════════════════════════════════════════
+def _steg_bruteforce(target_file, console):
+    """
+    Run steghide extraction against a wordlist (rockyou).
+    This is the deep-dive when the automated Phase 5 common passwords fail.
+    """
+    if not _has_tool("steghide"):
+        console.print("[red]'steghide' not found on system. Install: `apt install steghide`[/red]")
+        return
+    
+    # Check MIME compatibility
+    if _has_tool("file"):
+        ok, out, _ = _run(["file", "-b", "--mime-type", target_file])
+        mime = out.strip() if ok else ""
+        if not any(x in mime.lower() for x in ['jpeg', 'jpg', 'bmp', 'wav', 'au']):
+            console.print(f"[yellow]Warning: steghide only supports JPEG, BMP, WAV, AU files. Detected: {mime}[/yellow]")
+            console.print("[dim]Continuing anyway...[/dim]")
+    
+    wordlist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+    wordlist_path = os.path.join(wordlist_dir, 'rockyou.txt')
+    
+    if not os.path.exists(wordlist_path):
+        console.print("[red]RockYou wordlist not found at data/rockyou.txt[/red]")
+        console.print("[dim]Run 'crypto crack <any_hash>' first to auto-download it.[/dim]")
+        return
+    
+    console.print(f"[cyan]Brute-forcing steghide passphrase on {target_file}...[/cyan]")
+    
+    tried = 0
+    with open(wordlist_path, 'r', encoding='latin-1') as f:
+        for line in f:
+            pw = line.rstrip('\n')
+            if not pw:
+                continue
+            tried += 1
+            
+            if tried % 500 == 0:
+                console.print(f"  [dim]Tried {tried} passphrases...[/dim]", end="\r")
+            
+            cmd = ["steghide", "extract", "-sf", target_file, "-p", pw, "-f"]
+            ok, out, err = _run(cmd, timeout=5)
+            combined = out + err
+            
+            if ok and "wrote extracted data" in combined.lower():
+                console.print(f"\n")
+                console.print(Panel(
+                    f"[bold green]CRACKED![/bold green]\n"
+                    f"Passphrase: [bold]{pw}[/bold]\n"
+                    f"Attempts: {tried:,}\n"
+                    f"Output: {combined.strip()}",
+                    title="🔓 Steghide Brute-Force Success!", border_style="green"))
+                return
+    
+    console.print(f"\n[yellow]Exhausted {tried:,} passphrases. No hidden data found.[/yellow]")
